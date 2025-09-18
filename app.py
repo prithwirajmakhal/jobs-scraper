@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from jobspy import scrape_jobs
 from flask_cors import CORS
+import pandas as pd
 SUPPORTED_SITES = ['bayt', 'bdjobs', 'glassdoor',
                    'google', 'indeed', 'linkedin', 'naukri']
 
@@ -70,6 +71,20 @@ def scrape_linkedin_jobs():
             country_indeed=country,
             linkedin_fetch_description=fetch_description
         )
+        
+        # Ensure we have a DataFrame-like object
+        if not hasattr(jobs, "to_dict"):
+            raise ValueError("scrape_jobs did not return a DataFrame-like object")
+
+        # Replace NaN/NaT with None so jsonify produces valid JSON (null)
+        jobs = jobs.where(pd.notnull(jobs), None)
+
+        # Convert datetime-like values (e.g. pandas.Timestamp) to ISO strings
+        if 'date_posted' in jobs.columns:
+            jobs['date_posted'] = jobs['date_posted'].apply(
+                lambda v: v.isoformat() if hasattr(v, "isoformat") else v
+            )
+
 
         # Convert DataFrame to dictionary for JSON response
         jobs_dict = jobs.to_dict(orient='records')
